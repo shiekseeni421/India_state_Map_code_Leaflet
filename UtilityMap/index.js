@@ -1,100 +1,118 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { MapContainer, TileLayer, GeoJSON, Tooltip } from "react-leaflet";
-import {
-  Box,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Paper,
-  Typography,
-} from "@mui/material";
+import React, { useState, useRef, useEffect } from "react";
+import { MapContainer, GeoJSON } from "react-leaflet";
+import { Box, Paper, Typography } from "@mui/material";
 import "leaflet/dist/leaflet.css";
 
+// Precise bounds to crop everything except India
 const indiaBounds = [
-  [6.0, 68.0],
-  [36.0, 98.0],
+  [6.5, 68.0],
+  [36.0, 97.5],
 ];
 
+// Data with 2025 state names
 const utilityData = {
-  electricity: {
-    "Andhra Pradesh": 85,
-    "Arunachal Pradesh": 45,
-    Assam: 60,
-    Bihar: 52,
-    Gujarat: 95,
-    Karnataka: 88,
-    Kerala: 99,
-    Maharashtra: 92,
-    Orissa: 65,
-    "Tamil Nadu": 98,
-    "Uttar Pradesh": 70,
-    "West Bengal": 82,
-    Rajasthan: 75,
-    "Madhya Pradesh": 68,
-    Punjab: 90,
-    Haryana: 89,
+  utility: {
+    "Andhra Pradesh": { value: 85, color: "#f36709ff" },
+    Telangana: { value: 45, color: "#f1cb20ff" },
+    Karnataka: { value: 88, color: "#57d80cff" },
+    Kerala: { value: 99, color: "#c7a708ff" },
+    "Tamil Nadu": { value: 98, color: "#0b46a0ff" },
+    Puducherry: { value: 92, color: "#0b82a0ff" },
+    Lakshadweep: { value: 95, color: "#c70909ff" },
+    "Jammu and Kashmir": { value: 70, color: "#1cac23ff" },
+    Ladakh: { value: 65, color: "#e91147ff" },
+    "Himachal Pradesh": { value: 82, color: "#11a6e9ff" },
+    Punjab: { value: 91, color: "#9ae260ff" },
+    Haryana: { value: 89, color: "#25678dff" },
+    Uttarakhand: { value: 78, color: "#14b99eff" },
+    "Uttar Pradesh": { value: 72, color: "#bb2166ff" },
+    Delhi: { value: 98, color: "#5611e9ff" },
+    Chandigarh: { value: 96, color: "#11e988ff" },
+    Rajasthan: { value: 75, color: "#e98d11ff" },
+    Gujarat: { value: 95, color: "#155196ff" },
+    Maharashtra: { value: 92, color: "#0eb47dff" },
+    Goa: { value: 97, color: "#e9e911ff" },
+    "Dadra and Nagar Haveli and Daman and Diu": {
+      value: 88,
+      color: "#11e911ff",
+    },
+    "Madhya Pradesh": { value: 68, color: "#e91111ff" },
+    Chhattisgarh: { value: 64, color: "#1172e9ff" },
+    Bihar: { value: 52, color: "#88e911ff" },
+    Jharkhand: { value: 55, color: "#11e9a6ff" },
+    Odisha: { value: 65, color: "#e9119dff" },
+    "West Bengal": { value: 82, color: "#11d5e9ff" },
+    "Andaman and Nicobar Islands": { value: 76, color: "#e9b011ff" },
+    Sikkim: { value: 81, color: "#4711e9ff" },
+    "Arunachal Pradesh": { value: 45, color: "#11e972ff" },
+    Assam: { value: 60, color: "#e911ccff" },
+    Nagaland: { value: 58, color: "#2de911ff" },
+    Manipur: { value: 55, color: "#113ce9ff" },
+    Mizoram: { value: 62, color: "#e95b11ff" },
+    Tripura: { value: 67, color: "#11e92dff" },
+    Meghalaya: { value: 59, color: "#b011e9ff" },
   },
-  water: {
-    "Andhra Pradesh": 70,
-    Gujarat: 80,
-    Karnataka: 75,
-    Kerala: 95,
-    Maharashtra: 85,
-    Orissa: 50,
-    "Tamil Nadu": 90,
-    "West Bengal": 60,
-  },
-};
-
-const getColor = (value) => {
-  return value > 80
-    ? "#7c1608ff"
-    : value > 60
-    ? "#c47916ff"
-    : value > 40
-    ? "#1821acff"
-    : value > 20
-    ? "#2781d4ff"
-    : "#183488ff";
 };
 
 export default function IndiaMap({ indiaGeoJson }) {
-  const [utility, setUtility] = useState("electricity");
+  const [utility] = useState("utility"); // Hardcoded based on your object structure
   const geoJsonRef = useRef();
+  const mapRef = useRef();
+
+  // Resize logic: Ensures map refits whenever the container or window resizes
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+        mapRef.current.fitBounds(indiaBounds);
+      }
+    });
+
+    const mapContainer = document.querySelector(".leaflet-container");
+    if (mapContainer) resizeObserver.observe(mapContainer);
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   const style = (feature) => {
-    const stateName = feature.properties.NAME_1;
-    const value = utilityData[utility][stateName] || 0;
+    const stateName = feature.properties.shapeName || feature.properties.NAME_1;
+    const stateEntry = utilityData[utility][stateName];
+
     return {
-      fillColor: getColor(value),
-      weight: 1.5,
+      fillColor: stateEntry ? stateEntry.color : "#cccccc",
+      weight: 1,
       opacity: 1,
-      color: "white",
+      color: "#999999",
       fillOpacity: 0.8,
     };
   };
 
   const onEachFeature = (feature, layer) => {
-    const stateName = feature.properties.NAME_1;
-    const value = utilityData[utility][stateName] || 0;
+    const stateName = feature.properties.shapeName || feature.properties.NAME_1;
+    const stateEntry = utilityData[utility][stateName];
+    const value = stateEntry ? stateEntry.value : "N/A";
 
-    // This adds the percentage label that appears on hover
     layer.bindTooltip(
-      `<div style="text-align:center;">
+      `<div style="font-family: sans-serif;">
         <strong>${stateName}</strong><br/>
-        <span style="font-size: 1.2em; color: #08306b;">${value}%</span>
+        Value: ${value}%
       </div>`,
-      { sticky: true, direction: "top", opacity: 0.9 }
+      { sticky: true, direction: "top" }
     );
 
     layer.on({
       mouseover: (e) => {
-        const l = e.target;
-        l.setStyle({ weight: 3, color: "#333", fillOpacity: 0.9 });
-        l.bringToFront();
+        const layer = e.target;
+        layer.setStyle({
+          weight: 2,
+          color: "#ffffff",
+          fillOpacity: 0.9,
+        });
+        layer.bringToFront();
       },
       mouseout: (e) => {
         geoJsonRef.current.resetStyle(e.target);
@@ -106,79 +124,57 @@ export default function IndiaMap({ indiaGeoJson }) {
     <Paper
       elevation={0}
       sx={{
-        p: 2,
-        border: "1px solid #eaeaea",
+        p: { xs: 1, sm: 2 },
+        bgcolor: "#e6ebf1ff",
         borderRadius: 2,
-        position: "relative",
       }}
     >
       <Box
         sx={{
-          mb: 3,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel>Utility Statistics</InputLabel>
-          <Select
-            value={utility}
-            label="Utility Statistics"
-            onChange={(e) => setUtility(e.target.value)}
-          >
-            <MenuItem value="electricity">Electricity Coverage</MenuItem>
-            <MenuItem value="water">Tap Water Access</MenuItem>
-          </Select>
-        </FormControl>
-
-        {/* Legend Box */}
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          {[0, 20, 40, 60, 80].map((val) => (
-            <Box
-              key={val}
-              sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-            >
-              <Box
-                sx={{
-                  width: 15,
-                  height: 15,
-                  bgcolor: getColor(val + 1),
-                  borderRadius: "2px",
-                }}
-              />
-              <Typography variant="caption">{val}%+</Typography>
-            </Box>
-          ))}
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          height: "600px",
+          position: "relative",
+          // Fluid height based on screen size
+          height: { xs: "450px", sm: "600px", md: "700px" },
           width: "100%",
-          bgcolor: "#f8f9fa",
-          borderRadius: 2,
+          bgcolor: "#ffffff",
+          borderRadius: 1,
           overflow: "hidden",
+          border: "1px solid #d1d9e2",
         }}
       >
         <MapContainer
-          center={[22.9734, 78.6569]}
-          zoom={5}
-          minZoom={4.5}
-          maxBounds={indiaBounds}
-          maxBoundsViscosity={1.0}
-          style={{ height: "100%", width: "100%" }}
+          bounds={indiaBounds}
+          zoomSnap={1}
+          dragging={true} // Enabled for mobile touch panning
+          zoomControl={false}
+          scrollWheelZoom={false}
+          doubleClickZoom={false}
+          style={{ height: "100%", width: "100%", background: "transparent" }}
+          ref={mapRef}
         >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png" />
-
-          <GeoJSON
-            data={indiaGeoJson}
-            style={style}
-            onEachFeature={onEachFeature}
-            ref={geoJsonRef}
-          />
+          {indiaGeoJson && (
+            <GeoJSON
+              data={indiaGeoJson}
+              style={style}
+              onEachFeature={onEachFeature}
+              ref={geoJsonRef}
+            />
+          )}
         </MapContainer>
+
+        {/* Optional Title Overlay */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: 10,
+            left: 15,
+            zIndex: 1000,
+            pointerEvents: "none",
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333" }}>
+            India Utility Distribution
+          </Typography>
+        </Box>
       </Box>
     </Paper>
   );
